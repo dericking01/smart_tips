@@ -31,3 +31,15 @@ CREATE TABLE IF NOT EXISTS smart_tips.generated_tips (
     delivery_status VARCHAR(20),
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS smart_tips.sms_logs (
+    id BIGSERIAL PRIMARY KEY,
+    msisdn VARCHAR(20),
+    message_text TEXT,
+    status VARCHAR(50),
+    port VARCHAR(10),
+    response_code INTEGER,
+    error TEXT,
+    attempt INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW()
+);

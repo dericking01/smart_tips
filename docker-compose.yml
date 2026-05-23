@@ -43,3 +43,13 @@ services:
       - .env
     depends_on:
       - redis
+
+  retry-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m app.workers.retry_worker
+    env_file:
+      - .env
+    depends_on:
+      - redis

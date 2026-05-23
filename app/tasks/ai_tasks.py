@@ -1,6 +1,5 @@
 import hashlib
 import traceback
-from rq import Retry
 from app.classifier.classifier import classify_topics
 from app.config.logger import logger
 from app.config.settings import settings
@@ -173,10 +172,9 @@ def process_profile(msisdn, messages):
 
     try:
         sms_queue.enqueue(
-            'app.sms.sender.send_sms',
+            'app.tasks.retry_tasks.retry_send_sms',
             msisdn,
-            sms_text,
-            retry=Retry(max=2)
+            sms_text
         )
     except Exception as exc:
         logger.exception(
