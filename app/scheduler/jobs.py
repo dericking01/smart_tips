@@ -1,11 +1,8 @@
 from app.database.subscriptions import fetch_active_subscribers
 from app.database.chat_history import fetch_recent_conversations
 from app.conversations.aggregator import aggregate_conversations
-from app.classifier.classifier import classify_topics
-from app.generator.generator import generate_sms
-from app.validation.length import validate_length
-from app.validation.safety import validate_safety
-from app.sms.sender import send_sms
+from app.queue.redis_client import ai_queue
+
 
 def process_smart_tips_job():
     subscribers = fetch_active_subscribers()
@@ -17,20 +14,9 @@ def process_smart_tips_job():
     for msisdn in subscribers:
         messages = grouped.get(msisdn, [])
 
-        profile = {
-            "language": "sw",
-            "topics": ["general_health"]
-        }
-
-        if messages:
-            profile = classify_topics(messages)
-
-        sms = generate_sms(profile)
-
-        if not validate_length(sms):
+        # Enqueue an AI processing task for every subscriber (fallback if no messages)
+        try:
+            ai_queue.enqueue('app.tasks.ai_tasks.process_profile', msisdn, messages)
+        except Exception:
+            # best-effort: continue to next subscriber
             continue
-
-        if not validate_safety(sms):
-            continue
-
-        send_sms(msisdn, sms)
