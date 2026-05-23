@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+psycopg2-binary
+sqlalchemy
+redis
+rq
+openai
+python-dotenv
+apscheduler
+requests
+pydantic
+pydantic-settings
+python-json-logger

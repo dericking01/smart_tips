@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: smart-health-api
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: smart-health-redis
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+
+  ai-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m app.workers.ai_worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
+
+  sms-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m app.workers.sms_worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
