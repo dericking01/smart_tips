@@ -1,5 +1,7 @@
 import hashlib
+import re
 import traceback
+import unicodedata
 from app.classifier.classifier import classify_topics
 from app.config.logger import logger
 from app.config.settings import settings
@@ -24,8 +26,20 @@ FALLBACK_SMS = {
 }
 
 
+def _normalize_text(text):
+    if not isinstance(text, str):
+        return ''
+
+    normalized = unicodedata.normalize('NFC', text)
+    normalized = normalized.strip()
+    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = normalized.lower()
+    return normalized
+
+
 def _sha256(text):
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+    normalized_text = _normalize_text(text)
+    return hashlib.sha256(normalized_text.encode('utf-8')).hexdigest()
 
 
 def _get_fallback_sms(language):
