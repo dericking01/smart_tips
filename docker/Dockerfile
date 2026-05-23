@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "run.py"]
+CMD ["sh", "-c", "python app/utils/wait_for_db.py && python run.py"]
