@@ -9,3 +9,4 @@ redis_conn = redis.Redis(
 
 ai_queue = Queue("ai_generation_queue", connection=redis_conn)
 sms_queue = Queue("sms_dispatch_queue", connection=redis_conn)
+retry_queue = Queue("retry_queue", connection=redis_conn)

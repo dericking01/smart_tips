@@ -1,5 +1,6 @@
 import json
 from openai import OpenAI
+from app.config.logger import logger
 from app.config.settings import settings
 from app.classifier.prompts import CLASSIFIER_PROMPT
 
@@ -24,4 +25,27 @@ def classify_topics(messages):
     )
 
     content = response.choices[0].message.content
-    return json.loads(content)
+    usage = getattr(response, 'usage', None)
+    logger.info(
+        'classifier_response',
+        extra={
+            'event': 'classifier_response',
+            'classifier_model': settings.OPENAI_MODEL,
+            'prompt': CLASSIFIER_PROMPT.strip(),
+            'user_input': joined,
+            'output': content,
+            'usage': usage
+        }
+    )
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        logger.error(
+            'classifier_invalid_json',
+            extra={
+                'event': 'classifier_invalid_json',
+                'output': content
+            }
+        )
+        raise

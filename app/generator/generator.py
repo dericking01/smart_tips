@@ -1,4 +1,5 @@
 from openai import OpenAI
+from app.config.logger import logger
 from app.config.settings import settings
 from app.generator.prompts import GENERATOR_PROMPT
 
@@ -20,4 +21,18 @@ def generate_sms(profile):
         ]
     )
 
-    return response.choices[0].message.content.strip()
+    content = response.choices[0].message.content.strip()
+    usage = getattr(response, 'usage', None)
+    logger.info(
+        'generator_response',
+        extra={
+            'event': 'generator_response',
+            'generator_model': settings.OPENAI_MODEL,
+            'prompt': GENERATOR_PROMPT.strip(),
+            'profile': profile,
+            'output': content,
+            'usage': usage
+        }
+    )
+
+    return content
