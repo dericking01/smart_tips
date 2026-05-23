@@ -34,6 +34,12 @@ def _normalize_text(text):
     normalized = normalized.strip()
     normalized = re.sub(r'\s+', ' ', normalized)
     normalized = normalized.lower()
+    normalized = ''.join(
+        ch for ch in normalized
+        if unicodedata.category(ch)[0] != 'P'
+    )
+    normalized = normalized.strip()
+    normalized = re.sub(r'\s+', ' ', normalized)
     return normalized
 
 
