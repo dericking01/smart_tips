@@ -53,8 +53,21 @@ def _get_fallback_sms(language):
     return choices[0] if isinstance(choices, list) else choices
 
 
+ALLOWED_LANGUAGES = {'en', 'sw'}
+
+
 def _build_profile(classification):
     language = classification.get('language', 'sw') or 'sw'
+    if language not in ALLOWED_LANGUAGES:
+        logger.warning(
+            'unsupported_language_detected',
+            extra={
+                'event': 'unsupported_language_detected',
+                'detected_language': language,
+                'fallback': 'sw'
+            }
+        )
+        language = 'sw'
     topics = classification.get('topics', [])
     return {
         'language': language,
