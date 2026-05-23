@@ -21,8 +21,8 @@ scheduler.add_job(
 scheduler.add_job(
     process_smart_tips_job,
     'cron',
-    hour=19,
-    minute=17
+    hour=1,
+    minute=59
 )
 
 def start_scheduler():
