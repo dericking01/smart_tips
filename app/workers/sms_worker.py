@@ -1,9 +1,9 @@
-from rq import Worker, Queue, Connection
+from rq import Worker, Queue
 from app.queue.redis_client import redis_conn
 
 listen = ['sms_dispatch_queue']
 
 if __name__ == '__main__':
-    with Connection(redis_conn):
-        worker = Worker(map(Queue, listen))
-        worker.work()
+    queues = [Queue(name, connection=redis_conn) for name in listen]
+    worker = Worker(queues, connection=redis_conn)
+    worker.work()

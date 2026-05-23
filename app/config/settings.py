@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SMS_USERNAME: str
     SMS_PASSWORD: str
     SMS_FROM: str
+    TIMEZONE: str = "Africa/Dar_es_Salaam"
 
     class Config:
         env_file = ".env"
