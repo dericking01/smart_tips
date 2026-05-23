@@ -1,10 +1,11 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["sh", "-c", "python app/utils/wait_for_db.py && python run.py"]
+CMD ["sh", "-c", "python -m app.utils.wait_for_db && python run.py"]
