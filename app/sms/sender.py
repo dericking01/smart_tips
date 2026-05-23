@@ -1,10 +1,33 @@
+import time
 import requests
 from requests.exceptions import RequestException
 from app.config.logger import logger
 from app.config.settings import settings
 from app.database.sms_logs import insert_sms_log
+from app.queue.redis_client import redis_conn
 
 PORTS = [port.strip() for port in settings.SMS_PORTS.split(',') if port.strip()]
+TPS = int(getattr(settings, 'SMS_TPS', 200))
+
+
+def _wait_for_slot(port):
+    # Redis-based per-second counter to enforce TPS across workers
+    now = int(time.time())
+    key = f"sms_rate:{port}:{now}"
+    count = redis_conn.incr(key)
+    if count == 1:
+        # expire after 2 seconds to cover clock skew
+        redis_conn.expire(key, 2)
+
+    if count <= TPS:
+        return
+
+    # rate exceeded; sleep until next second boundary then try again
+    wait = 1.0 - (time.time() - now)
+    if wait < 0:
+        wait = 0.01
+    time.sleep(wait)
+
 
 def send_sms(msisdn, message):
     last_error = None
@@ -12,6 +35,10 @@ def send_sms(msisdn, message):
 
     for port in PORTS:
         attempt += 1
+
+        # enforce per-port TPS using Redis
+        _wait_for_slot(port)
+
         url = f"http://{settings.SMS_HOST}:{port}/cgi-bin/sendsms"
         payload = {
             "username": settings.SMS_USERNAME,

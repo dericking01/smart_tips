@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     SMS_HOST: str
     SMS_PORTS: str
+    SMS_TPS: int = 200
 
     SMS_USERNAME: str
     SMS_PASSWORD: str
