@@ -6,6 +6,8 @@ Two jobs that run before each dispatch window:
   prepare_all_tips()
       Enqueues AI processing for every currently active subscriber.
       Marks each msisdn in a Redis window-set so we know who was handled.
+      Messages are separated into {"last_24h": [...], "older": [...]} so the
+      classifier can apply recency-based topic scoring.
 
   prepare_late_subscribers()
       Runs just before the send job. Re-queries the subscriber list and
@@ -24,8 +26,11 @@ from app.database.subscriptions import fetch_active_subscribers
 from app.queue.redis_client import ai_queue, redis_conn
 
 # Redis key prefix for the per-window prepared-subscriber set
-_WINDOW_KEY_PREFIX = "smart_tips:dispatch_window"
-_WINDOW_TTL_SECONDS = 4 * 60 * 60  # 4 hours — covers the full prepare→dispatch window
+_WINDOW_KEY_PREFIX    = "smart_tips:dispatch_window"
+_WINDOW_TTL_SECONDS   = 4 * 60 * 60   # 4 hours — covers the full prepare→dispatch window
+
+# Default empty message structure (sent when subscriber has no chat history)
+_EMPTY_MESSAGES: dict = {'last_24h': [], 'older': []}
 
 
 # ── Window helpers ────────────────────────────────────────────────────────────
@@ -40,7 +45,7 @@ def _get_window_key() -> str:
         tz = ZoneInfo(settings.TIMEZONE)
     except Exception:
         tz = None
-    now = datetime.now(tz) if tz else datetime.now()
+    now       = datetime.now(tz) if tz else datetime.now()
     send_hour = 7 if now.hour < 12 else 19
     return f"{_WINDOW_KEY_PREFIX}:{now.strftime('%Y%m%d')}_{send_hour:02d}00"
 
@@ -63,14 +68,24 @@ def prepare_all_tips():
     Runs ~50 minutes before the send job so workers have time to finish.
     """
     subscribers = fetch_active_subscribers()
-    rows = fetch_recent_conversations()
-    grouped = aggregate_conversations(rows)
+    rows        = fetch_recent_conversations()
+    grouped     = aggregate_conversations(rows)
+
+    logger.info(
+        'prepare_all_tips_chat_stats',
+        extra={
+            'event':                'prepare_all_tips_chat_stats',
+            'total_subscribers':    len(subscribers),
+            'subscribers_with_history': len(grouped),
+        }
+    )
 
     enqueued = 0
     for msisdn in subscribers:
         # Mark BEFORE enqueuing so the late-catch job can detect in-progress ones
         _mark_prepared(msisdn)
-        messages = grouped.get(msisdn, [])
+        messages = grouped.get(msisdn, _EMPTY_MESSAGES)
+
         try:
             ai_queue.enqueue('app.tasks.ai_tasks.process_profile', msisdn, messages)
             enqueued += 1
@@ -78,18 +93,18 @@ def prepare_all_tips():
             logger.exception(
                 'prepare_enqueue_failed',
                 extra={
-                    'event': 'prepare_enqueue_failed',
+                    'event':  'prepare_enqueue_failed',
                     'msisdn': msisdn,
-                    'error': str(exc)
+                    'error':  str(exc),
                 }
             )
 
     logger.info(
         'prepare_all_tips_done',
         extra={
-            'event': 'prepare_all_tips_done',
-            'enqueued': enqueued,
-            'total_subscribers': len(subscribers)
+            'event':             'prepare_all_tips_done',
+            'enqueued':          enqueued,
+            'total_subscribers': len(subscribers),
         }
     )
 
@@ -100,8 +115,8 @@ def prepare_late_subscribers():
     Only processes MSISDNs not already in the window Redis set.
     """
     subscribers = fetch_active_subscribers()
-    rows = fetch_recent_conversations()
-    grouped = aggregate_conversations(rows)
+    rows        = fetch_recent_conversations()
+    grouped     = aggregate_conversations(rows)
 
     late = 0
     for msisdn in subscribers:
@@ -109,7 +124,8 @@ def prepare_late_subscribers():
             continue  # already handled — skip
 
         _mark_prepared(msisdn)
-        messages = grouped.get(msisdn, [])
+        messages = grouped.get(msisdn, _EMPTY_MESSAGES)
+
         try:
             ai_queue.enqueue('app.tasks.ai_tasks.process_profile', msisdn, messages)
             late += 1
@@ -117,17 +133,17 @@ def prepare_late_subscribers():
             logger.exception(
                 'late_enqueue_failed',
                 extra={
-                    'event': 'late_enqueue_failed',
+                    'event':  'late_enqueue_failed',
                     'msisdn': msisdn,
-                    'error': str(exc)
+                    'error':  str(exc),
                 }
             )
 
     logger.info(
         'late_subscribers_queued',
         extra={
-            'event': 'late_subscribers_queued',
-            'count': late,
-            'total_subscribers': len(subscribers)
+            'event':             'late_subscribers_queued',
+            'count':             late,
+            'total_subscribers': len(subscribers),
         }
     )
