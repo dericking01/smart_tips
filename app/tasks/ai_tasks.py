@@ -1,6 +1,5 @@
 import hashlib
 import re
-import traceback
 import unicodedata
 from app.classifier.classifier import classify_topics
 from app.config.logger import logger
@@ -9,7 +8,6 @@ from app.database.classification_logs import insert_classification_log
 from app.database.generated_tips import insert_generated_tip, is_duplicate
 from app.database.topics import upsert_topics
 from app.generator.generator import generate_sms
-from app.queue.redis_client import sms_queue
 from app.tasks.prefetch_tasks import get_tip_from_pool
 from app.validation.length import validate_length
 from app.validation.safety import validate_safety
@@ -54,8 +52,8 @@ def _build_profile(classification):
     }
 
 
-def _validate_and_dispatch(msisdn, sms_text, language, topics, validation_status):
-    """Validate → dedup → persist → enqueue. Shared by both processing paths."""
+def _validate_and_store(msisdn, sms_text, language, topics, validation_status):
+    """Validate → dedup → persist as delivery_status='ready' for the dispatch job."""
     length_ok, length_reason = validate_length(sms_text)
     safe_ok, safe_reason = validate_safety(sms_text)
 
@@ -118,21 +116,12 @@ def _validate_and_dispatch(msisdn, sms_text, language, topics, validation_status
         return
 
     try:
-        insert_generated_tip(msisdn, topics, language, sms_text, tip_hash, validation_status, 'queued')
+        insert_generated_tip(msisdn, topics, language, sms_text, tip_hash, validation_status, 'ready')
     except Exception as exc:
         logger.exception(
             'generated_tip_log_failed',
             extra={'event': 'generated_tip_log_failed', 'msisdn': msisdn, 'error': str(exc)}
         )
-
-    try:
-        sms_queue.enqueue('app.tasks.retry_tasks.retry_send_sms', msisdn, sms_text)
-    except Exception as exc:
-        logger.exception(
-            'enqueue_sms_failed',
-            extra={'event': 'enqueue_sms_failed', 'msisdn': msisdn, 'error': str(exc)}
-        )
-        traceback.print_exc()
 
 
 # ── Main task ─────────────────────────────────────────────────────────────────
@@ -164,7 +153,7 @@ def process_profile(msisdn, messages):
                 )
                 return
 
-        _validate_and_dispatch(
+        _validate_and_store(
             msisdn,
             sms_text,
             language='sw',
@@ -241,4 +230,4 @@ def process_profile(msisdn, messages):
         )
         return
 
-    _validate_and_dispatch(msisdn, sms_text, language, profile.get('topics', []), validation_status)
+    _validate_and_store(msisdn, sms_text, language, profile.get('topics', []), validation_status)

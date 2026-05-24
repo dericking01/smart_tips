@@ -49,3 +49,65 @@ def is_duplicate(msisdn, tip_hash, days=7):
     session.close()
 
     return len(rows) > 0
+
+
+def fetch_ready_tips():
+    """Return all tips prepared in the current dispatch window (last 3 hours).
+    Ordered oldest-first so earlier-prepared subscribers are sent first.
+    Columns: (id, msisdn, language, generated_tip)
+    """
+    session = SessionLocal()
+    query = text("""
+        SELECT id, msisdn, language, generated_tip
+        FROM smart_tips.generated_tips
+        WHERE delivery_status = 'ready'
+        AND created_at >= NOW() - INTERVAL '3 hours'
+        ORDER BY created_at ASC
+    """)
+    rows = session.execute(query).fetchall()
+    session.close()
+    return rows
+
+
+def update_delivery_status(tip_id, status):
+    """Update the delivery_status of a single tip after a dispatch attempt."""
+    session = SessionLocal()
+    query = text("""
+        UPDATE smart_tips.generated_tips
+        SET delivery_status = :status
+        WHERE id = :tip_id
+    """)
+    session.execute(query, {"tip_id": tip_id, "status": status})
+    session.commit()
+    session.close()
+
+
+def fetch_failed_tips(max_retries: int = 2, window_hours: int = 2):
+    """Return failed tips from the current window that are still eligible for retry.
+    Columns: (id, msisdn, language, generated_tip)
+    """
+    session = SessionLocal()
+    q = text(f"""
+        SELECT id, msisdn, language, generated_tip
+        FROM smart_tips.generated_tips
+        WHERE delivery_status = 'failed'
+        AND retry_count < :max_retries
+        AND created_at >= NOW() - INTERVAL '{int(window_hours)} hours'
+        ORDER BY created_at ASC
+    """)
+    rows = session.execute(q, {"max_retries": max_retries}).fetchall()
+    session.close()
+    return rows
+
+
+def increment_retry_count(tip_id):
+    """Increment retry_count after a failed retry attempt (keeps delivery_status='failed')."""
+    session = SessionLocal()
+    query = text("""
+        UPDATE smart_tips.generated_tips
+        SET retry_count = retry_count + 1
+        WHERE id = :tip_id
+    """)
+    session.execute(query, {"tip_id": tip_id})
+    session.commit()
+    session.close()
