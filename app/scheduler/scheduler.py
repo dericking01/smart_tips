@@ -18,8 +18,8 @@ scheduler.add_job(prefetch_generic_tips_job, 'cron', hour=6, minute=45)
 scheduler.add_job(process_smart_tips_job,    'cron', hour=6, minute=50)
 
 # ── Run 2: mid-morning ────────────────────────────────────────────────────────
-scheduler.add_job(prefetch_generic_tips_job, 'cron', hour=12, minute=10)
-scheduler.add_job(process_smart_tips_job,    'cron', hour=12, minute=18)
+scheduler.add_job(prefetch_generic_tips_job, 'cron', hour=13, minute=17)
+scheduler.add_job(process_smart_tips_job,    'cron', hour=13, minute=23)
 
 
 def start_scheduler():
