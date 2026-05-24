@@ -2,7 +2,7 @@ from sqlalchemy import text
 from app.database.postgres import SessionLocal
 
 
-def insert_sms_log(msisdn, text, status, port=None, error=None, attempt=1, response_code=None):
+def insert_sms_log(msisdn, message_text, status, port=None, error=None, attempt=1, response_code=None):
     session = SessionLocal()
 
     query = text("""
@@ -14,7 +14,7 @@ def insert_sms_log(msisdn, text, status, port=None, error=None, attempt=1, respo
 
     session.execute(query, {
         "msisdn": msisdn,
-        "message_text": text,
+        "message_text": message_text,
         "status": status,
         "port": port,
         "error": error,

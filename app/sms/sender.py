@@ -52,7 +52,7 @@ def send_sms(msisdn, message):
             response = requests.get(url, params=payload, timeout=20)
             insert_sms_log(
                 msisdn=msisdn,
-                text=message,
+                message_text=message,
                 status='attempt',
                 port=port,
                 response_code=response.status_code,
@@ -78,7 +78,7 @@ def send_sms(msisdn, message):
             last_error = exc
             insert_sms_log(
                 msisdn=msisdn,
-                text=message,
+                message_text=message,
                 status='port_unavailable',
                 port=port,
                 response_code=None,
@@ -99,7 +99,7 @@ def send_sms(msisdn, message):
 
     insert_sms_log(
         msisdn=msisdn,
-        text=message,
+        message_text=message,
         status='failed',
         port=None,
         response_code=None,

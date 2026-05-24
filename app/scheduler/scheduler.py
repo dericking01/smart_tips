@@ -1,6 +1,6 @@
 from apscheduler.schedulers.blocking import BlockingScheduler
 from zoneinfo import ZoneInfo
-from app.scheduler.jobs import process_smart_tips_job
+from app.scheduler.jobs import prefetch_generic_tips_job, process_smart_tips_job
 from app.config.settings import settings
 
 # Use configured timezone (default Africa/Dar_es_Salaam)
@@ -11,19 +11,16 @@ except Exception:
 
 scheduler = BlockingScheduler(timezone=tz)
 
-scheduler.add_job(
-    process_smart_tips_job,
-    'cron',
-    hour=6,
-    minute=50
-)
+# ── Run 1: morning ────────────────────────────────────────────────────────────
+# Prefetch generic tips pool 5 minutes before the main job so the pool is
+# always warm when process_smart_tips_job starts enqueueing tasks.
+scheduler.add_job(prefetch_generic_tips_job, 'cron', hour=6, minute=45)
+scheduler.add_job(process_smart_tips_job,    'cron', hour=6, minute=50)
 
-scheduler.add_job(
-    process_smart_tips_job,
-    'cron',
-    hour=1,
-    minute=59
-)
+# ── Run 2: mid-morning ────────────────────────────────────────────────────────
+scheduler.add_job(prefetch_generic_tips_job, 'cron', hour=12, minute=10)
+scheduler.add_job(process_smart_tips_job,    'cron', hour=12, minute=18)
+
 
 def start_scheduler():
     scheduler.start()
