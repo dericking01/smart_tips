@@ -31,3 +31,11 @@ services:
       - .env
     depends_on:
       - redis
+    # Only processes with-history subscribers now (~2-3% of total).
+    # 5 replicas handle ~800 AI tasks in parallel — all finish well before dispatch.
+    # Scale up/down based on your subscriber count:
+    #   docker compose up --scale ai-worker=10
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure

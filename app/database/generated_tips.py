@@ -100,6 +100,55 @@ def fetch_failed_tips(max_retries: int = 2, window_hours: int = 2):
     return rows
 
 
+def bulk_insert_pool_tips(records: list) -> int:
+    """Insert pool-tip rows for many subscribers in chunked bulk operations.
+
+    Args:
+        records: list of dicts — {msisdn, language, tip, tip_hash}
+
+    Returns:
+        Number of chunks committed (each chunk = up to 500 rows).
+
+    Rows are stored as validation_status='generic', delivery_status='ready',
+    topics=[].  A WHERE NOT EXISTS guard prevents double-insert if the job
+    is re-run: skips any msisdn that already has a 'ready' tip in the last
+    3 hours (same window used by fetch_ready_tips).
+    """
+    if not records:
+        return 0
+
+    CHUNK = 500
+    session = SessionLocal()
+    try:
+        for i in range(0, len(records), CHUNK):
+            chunk = records[i: i + CHUNK]
+            session.execute(
+                text("""
+                    INSERT INTO smart_tips.generated_tips
+                        (msisdn, topics, language, generated_tip,
+                         tip_hash, validation_status, delivery_status)
+                    SELECT
+                        :msisdn, '[]'::jsonb, :language, :tip,
+                        :tip_hash, 'generic', 'ready'
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM smart_tips.generated_tips
+                        WHERE msisdn = :msisdn
+                          AND delivery_status IN ('ready', 'sent')
+                          AND created_at >= NOW() - INTERVAL '3 hours'
+                    )
+                """),
+                chunk,
+            )
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    return len(records)
+
+
 def increment_retry_count(tip_id):
     """Increment retry_count after a failed retry attempt (keeps delivery_status='failed')."""
     session = SessionLocal()

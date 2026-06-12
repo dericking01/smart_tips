@@ -79,6 +79,25 @@ def prefetch_generic_tips():
             )
 
 
+def get_pool_tips(language: str = 'sw') -> list:
+    """Return the full list of tips in the Redis pool for a language.
+    Used by the bulk-insert path in generation_tasks to assign tips to
+    all no-history subscribers in one shot without re-fetching per subscriber.
+    Returns [] if the pool is empty or missing.
+    """
+    key = f"{POOL_KEY_PREFIX}:{language}"
+    raw = redis_conn.get(key)
+    if raw:
+        try:
+            return json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning(
+                'pool_decode_error',
+                extra={'event': 'pool_decode_error', 'language': language}
+            )
+    return []
+
+
 def get_tip_from_pool(language: str = 'sw') -> str | None:
     """Return a random tip from the pre-generated Redis pool.
     Falls back to the other language pool if the requested one is missing.
