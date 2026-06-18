@@ -100,7 +100,7 @@ def fetch_failed_tips(max_retries: int = 2, window_hours: int = 2):
     return rows
 
 
-def expire_stale_ready_tips(older_than_hours: int = 12) -> int:
+def expire_stale_ready_tips(older_than_hours: int = 6) -> int:
     """Mark ready tips that are older than the given threshold as 'expired'.
 
     Called at the start of each dispatch job.  Prevents stale tips from a

@@ -167,7 +167,7 @@ def dispatch_all_ready_tips():
     # This cleans up stale 'ready' rows that accumulated when the bulk insert
     # ran late (e.g. after dispatch already fired) and prevents them from
     # clogging the table forever.
-    expired = expire_stale_ready_tips(older_than_hours=12)
+    expired = expire_stale_ready_tips(older_than_hours=6)
     if expired:
         logger.info(
             'stale_tips_expired',
