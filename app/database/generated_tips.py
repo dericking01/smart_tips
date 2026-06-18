@@ -100,6 +100,32 @@ def fetch_failed_tips(max_retries: int = 2, window_hours: int = 2):
     return rows
 
 
+def expire_stale_ready_tips(older_than_hours: int = 12) -> int:
+    """Mark ready tips that are older than the given threshold as 'expired'.
+
+    Called at the start of each dispatch job.  Prevents stale tips from a
+    missed prepare→dispatch cycle from accumulating indefinitely and keeps
+    the generated_tips table clean.  Returns the number of rows expired.
+    """
+    session = SessionLocal()
+    try:
+        result = session.execute(
+            text(f"""
+                UPDATE smart_tips.generated_tips
+                SET delivery_status = 'expired'
+                WHERE delivery_status = 'ready'
+                  AND created_at < NOW() - INTERVAL '{int(older_than_hours)} hours'
+            """)
+        )
+        session.commit()
+        return result.rowcount
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 def bulk_insert_pool_tips(records: list) -> int:
     """Insert pool-tip rows for many subscribers in chunked bulk operations.
 

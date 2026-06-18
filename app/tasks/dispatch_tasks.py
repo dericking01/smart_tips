@@ -25,6 +25,7 @@ from requests.exceptions import RequestException
 from app.config.logger import logger
 from app.config.settings import settings
 from app.database.generated_tips import (
+    expire_stale_ready_tips,
     fetch_failed_tips,
     fetch_ready_tips,
     increment_retry_count,
@@ -162,6 +163,17 @@ def _send_tips(tips, label: str = 'dispatch') -> list:
 
 def dispatch_all_ready_tips():
     """Initial dispatch at 07:00 / 19:00. Sends all 'ready' tips."""
+    # Expire tips from previous missed windows before reading ready count.
+    # This cleans up stale 'ready' rows that accumulated when the bulk insert
+    # ran late (e.g. after dispatch already fired) and prevents them from
+    # clogging the table forever.
+    expired = expire_stale_ready_tips(older_than_hours=12)
+    if expired:
+        logger.info(
+            'stale_tips_expired',
+            extra={'event': 'stale_tips_expired', 'count': expired}
+        )
+
     tips = fetch_ready_tips()
 
     if not tips:

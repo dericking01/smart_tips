@@ -151,10 +151,8 @@ def prepare_all_tips():
         }
     )
 
-    # ── Path A: bulk insert pool tips (no RQ queue, no OpenAI call) ───────────
-    _bulk_assign_pool_tips(no_history)
-
-    # ── Path B: personalised tips via AI workers ──────────────────────────────
+    # ── Path B: enqueue AI tasks FIRST so workers start immediately ──────────
+    # (bulk insert below is slower; doing it last avoids blocking AI workers)
     enqueued = 0
     for msisdn, messages in with_history:
         try:
@@ -169,6 +167,9 @@ def prepare_all_tips():
                     'error':  str(exc),
                 }
             )
+
+    # ── Path A: bulk insert pool tips after AI tasks are queued ─────────────
+    _bulk_assign_pool_tips(no_history)
 
     logger.info(
         'prepare_all_tips_done',

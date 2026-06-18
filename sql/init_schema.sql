@@ -32,6 +32,15 @@ CREATE TABLE IF NOT EXISTS smart_tips.generated_tips (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Speeds up the bulk-insert WHERE NOT EXISTS guard and fetch_ready_tips.
+-- Without this, each per-row subquery does a full table scan → 60-min bulk insert.
+CREATE INDEX IF NOT EXISTS idx_generated_tips_msisdn_status_time
+    ON smart_tips.generated_tips (msisdn, delivery_status, created_at DESC);
+
+-- Speeds up fetch_ready_tips ORDER BY created_at ASC + delivery_status filter.
+CREATE INDEX IF NOT EXISTS idx_generated_tips_status_time
+    ON smart_tips.generated_tips (delivery_status, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS smart_tips.sms_logs (
     id BIGSERIAL PRIMARY KEY,
     msisdn VARCHAR(20),
